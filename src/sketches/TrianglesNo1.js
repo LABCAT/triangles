@@ -35,6 +35,8 @@ const CLUSTER_MASKS = [
   [false, false, false, true],
 ];
 const ALL_CLUSTER_MASK = [true, true, true, true];
+const TOP_PAIR_CLUSTER_MASK = [true, true, false, false];
+const BOTTOM_PAIR_CLUSTER_MASK = [false, false, true, true];
 
 const PATTERN_MAX_CUE = 256;
 
@@ -42,6 +44,19 @@ const isInPattern = (cue) => cue >= 1 && cue <= PATTERN_MAX_CUE;
 
 const isAllClustersCue = (cue) =>
   (cue >= 97 && cue <= 128) || (cue >= 225 && cue <= 256);
+
+const PAIRED_CLUSTER_BLOCK_STARTS = [33, 161];
+const PAIRED_CLUSTER_BLOCK_LEN = 32;
+
+const getPairedClusterMask = (cue) => {
+  for (const start of PAIRED_CLUSTER_BLOCK_STARTS) {
+    const offset = cue - start;
+    if (offset < 0 || offset >= PAIRED_CLUSTER_BLOCK_LEN) continue;
+    const isBottomPair = Math.floor(offset / 8) % 2 === 0;
+    return isBottomPair ? BOTTOM_PAIR_CLUSTER_MASK : TOP_PAIR_CLUSTER_MASK;
+  }
+  return null;
+};
 
 const randomizeFftTriColors = (p) => {
   const colorGen = new ColorGenerator(p, p.color(p.random(360), 92, 94));
@@ -178,7 +193,13 @@ const sketch = (p) => {
         p.fftClusterMask = [...ALL_CLUSTER_MASK];
         p.fftPrevWasRandomCorner = false;
       } else {
-        p.fftClusterMask = pickRandomCornerMask(p);
+        const pairedMask = getPairedClusterMask(cue);
+        if (pairedMask) {
+          p.fftClusterMask = [...pairedMask];
+          p.fftPrevWasRandomCorner = false;
+        } else {
+          p.fftClusterMask = pickRandomCornerMask(p);
+        }
       }
     }
 
