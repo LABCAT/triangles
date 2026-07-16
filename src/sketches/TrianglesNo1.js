@@ -67,10 +67,28 @@ const TRACK2_CLEAR_RANGES = [
   [193, 253],
   [449, 509],
 ];
+const TRACK2_BOTTOM_FADE_RANGES = [
+  [69, 81],
+  [101, 113],
+  [325, 337],
+  [357, 369],
+];
+const TRACK2_TOP_FADE_RANGES = [
+  [85, 97],
+  [117, 129],
+  [341, 353],
+  [373, 385],
+];
 const NO_OVERLAY_OPACITY = 0;
 
 const isTrack2ClearSection = (cue) =>
   TRACK2_CLEAR_RANGES.some(([start, end]) => cue >= start && cue <= end);
+
+const isTrack2BottomFadeSection = (cue) =>
+  TRACK2_BOTTOM_FADE_RANGES.some(([start, end]) => cue >= start && cue <= end);
+
+const isTrack2TopFadeSection = (cue) =>
+  TRACK2_TOP_FADE_RANGES.some(([start, end]) => cue >= start && cue <= end);
 
 const BD_OVERLAY = {
   topLeft: BD_BG_OVERLAY_OPACITY,
@@ -99,6 +117,18 @@ const FULL_FADE_OVERLAY = {
   bottomLeft: BD_BG_OVERLAY_OPACITY,
   bottomRight: BD_BG_OVERLAY_OPACITY,
 };
+
+const withBottomFade = (overlay) => ({
+  ...overlay,
+  bottomLeft: BD_BG_OVERLAY_OPACITY,
+  bottomRight: BD_BG_OVERLAY_OPACITY,
+});
+
+const withTopFade = (overlay) => ({
+  ...overlay,
+  topLeft: BD_BG_OVERLAY_OPACITY,
+  topRight: BD_BG_OVERLAY_OPACITY,
+});
 
 const pickRandomCornerMask = (p) => {
   let corner;
@@ -210,14 +240,20 @@ const sketch = (p) => {
   p.onTrack2Cue = function (note) {
     const cue = note.currentCue;
     const inClearSection = isTrack2ClearSection(cue);
-    
-    
-    if (note.midi === 36) {
-      console.log(note.currentCue);
-      setFourSegmentOverlayOpacity(p, inClearSection ? CLEAR_OVERLAY : BD_OVERLAY);
-    } else if (note.midi === 39) {
-      console.log(note.currentCue);
-      setFourSegmentOverlayOpacity(p, inClearSection ? FULL_FADE_OVERLAY : SD_OVERLAY);
+    const inBottomFadeSection = isTrack2BottomFadeSection(cue);
+    const inTopFadeSection = isTrack2TopFadeSection(cue);
+
+    if (note.midi === 36 || note.midi === 39) {
+      let overlay = inClearSection
+        ? note.midi === 36
+          ? CLEAR_OVERLAY
+          : FULL_FADE_OVERLAY
+        : note.midi === 36
+          ? BD_OVERLAY
+          : SD_OVERLAY;
+      if (inBottomFadeSection) overlay = withBottomFade(overlay);
+      if (inTopFadeSection) overlay = withTopFade(overlay);
+      setFourSegmentOverlayOpacity(p, overlay);
     }
   };
 
