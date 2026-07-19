@@ -2,6 +2,8 @@ import p5 from 'p5';
 import '@lib/p5.audioReact.js';
 import initCapture from '@lib/p5.capture.js';
 import ColorGenerator from '@lib/p5.colorGenerator.js';
+import { createDomLayerCaptureBackground } from '@lib/domLayerCaptureBackground.js';
+import { compositeDomCaptureExtension } from '@lib/extensions/compositeDomCapture.js';
 import {
   installFourSegmentBg,
   randomizeFourSegmentBg,
@@ -159,14 +161,20 @@ const sketch = (p) => {
     p.createCanvas(window.innerWidth, window.innerHeight);
     p.angleMode(p.DEGREES);
     p.colorMode(p.HSB, 360, 100, 100, 1);
-    p.bgWrapperEl.appendChild(p.canvas);
-    p.canvas.style.position = 'absolute';
+    p.canvas.style.position = 'fixed';
     p.canvas.style.top = '0';
     p.canvas.style.left = '0';
     p.canvas.style.zIndex = '1';
     p.canvas.style.background = 'transparent';
 
-    initCapture(p, { prefix: 'TrianglesNo1', enabled: false });
+    initCapture(p, {
+      prefix: 'TrianglesNo1',
+      enabled: false,
+      captureCSSBackground: true,
+      extension: compositeDomCaptureExtension({
+        background: createDomLayerCaptureBackground(p.bgWrapperEl),
+      }),
+    });
 
     randomizeFftTriColors(p);
 

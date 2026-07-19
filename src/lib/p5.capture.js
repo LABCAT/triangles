@@ -13,15 +13,23 @@ export default function initCapture(p, options = {}) {
   const prefix = isOptionsObject ? options.prefix ?? options.captureFilePrefix : options;
   const enabled = isOptionsObject ? !!options.enabled : options !== undefined ? true : p.captureEnabled ?? false;
   const captureCSSBackground = isOptionsObject ? !!options.captureCSSBackground : false;
+  const captureExtension =
+    isOptionsObject && options.extension && typeof options.extension === 'object' ? options.extension : null;
   const maxFramesPerZip =
     isOptionsObject && Number.isFinite(options.maxFramesPerZipPart) && options.maxFramesPerZipPart > 0
       ? Math.floor(options.maxFramesPerZipPart)
       : DEFAULT_MAX_FRAMES_PER_ZIP;
+  const frameCount =
+    isOptionsObject && Number.isFinite(options.frameCount) && options.frameCount > 0
+      ? Math.floor(options.frameCount)
+      : null;
 
   p.captureFilePrefix = prefix || p.captureFilePrefix || 'capture';
   p.captureEnabled = enabled;
   p.captureCSSBackground = captureCSSBackground;
+  p.captureExtension = captureExtension;
   p.captureMaxFramesPerZipPart = maxFramesPerZip;
+  p.captureFrameCount = frameCount;
 
   p.capturedFrames = [];
   p.frameNumber = 0;
@@ -32,6 +40,9 @@ export default function initCapture(p, options = {}) {
     const frameNum = p.frameNumber++;
 
     if (p.captureCSSBackground) {
+      if (typeof p.captureExtension?.captureFrameWithBackground === 'function') {
+        return p.captureExtension.captureFrameWithBackground(p, canvasElt, frameNum);
+      }
       return p.captureFrameWithBackground(canvasElt, frameNum);
     }
 
@@ -41,7 +52,7 @@ export default function initCapture(p, options = {}) {
           p.capturedFrames.push({
             blob,
             frameNumber: frameNum,
-            filename: `${p.captureFilePrefix}_${p.nf(frameNum, 5)}.png`
+            filename: `${p.captureFilePrefix}_${p.nf(frameNum, 5)}.png`,
           });
         }
         resolve();
@@ -91,12 +102,18 @@ export default function initCapture(p, options = {}) {
     const durFromBuffer = Number(p.song?.soundfile?.buffer?.duration ?? 0);
     const durSec = Math.max(durFromSound, durFromBuffer, 0);
     const framesFromAudio = Math.max(1, Math.floor(durSec * 60));
-    if (framesFromAudio !== p.totalAnimationFrames) {
+    const framesToCapture = p.captureFrameCount
+      ? Math.min(p.captureFrameCount, framesFromAudio)
+      : framesFromAudio;
+    if (framesToCapture !== p.totalAnimationFrames) {
       console.warn(
-        `[capture] totalAnimationFrames ${p.totalAnimationFrames} → ${framesFromAudio} (audio ${durSec.toFixed(3)}s @ 60fps)`
+        `[capture] totalAnimationFrames ${p.totalAnimationFrames} → ${framesToCapture}` +
+          (p.captureFrameCount
+            ? ` (limited to ${p.captureFrameCount}; audio ${durSec.toFixed(3)}s @ 60fps)`
+            : ` (audio ${durSec.toFixed(3)}s @ 60fps)`),
       );
     }
-    p.totalAnimationFrames = framesFromAudio;
+    p.totalAnimationFrames = framesToCapture;
 
     const cues = p.song._cues.slice().sort((a, b) => a.time - b.time);
     let cueIndex = 0;
@@ -153,15 +170,15 @@ export default function initCapture(p, options = {}) {
     }
 
     console.log(`Creating ZIP part ${p.zipPartNumber} with ${p.capturedFrames.length} frames...`);
-    
+
     p.capturedFrames.sort((a, b) => a.frameNumber - b.frameNumber);
-    
+
     const zip = new JSZip();
-    
+
     for (let i = 0; i < p.capturedFrames.length; i++) {
       const frame = p.capturedFrames[i];
       zip.file(frame.filename, frame.blob, { binary: true });
-      
+
       if ((i + 1) % 100 === 0) {
         console.log(`Added ${i + 1} / ${p.capturedFrames.length} frames to part ${p.zipPartNumber}...`);
       }
@@ -195,7 +212,7 @@ export default function initCapture(p, options = {}) {
       compression: 'STORE',
       streamFiles: true,
     });
-    
+
     const url = URL.createObjectURL(zipBlob);
     const link = document.createElement('a');
     link.href = url;
@@ -223,7 +240,7 @@ export default function initCapture(p, options = {}) {
           </foreignObject>
         </svg>
       `;
-      const blob = new Blob([svg], { type: "image/svg+xml" });
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
       const img = new Image();
       img.onload = () => {
@@ -243,19 +260,24 @@ export default function initCapture(p, options = {}) {
     const root = document.documentElement;
     const computed = getComputedStyle(canvasElt);
     const canvasBg = computed.getPropertyValue('--canvas-complex-bg').trim();
-    const gradientBg = (canvasBg && canvasBg !== 'none') ? canvasBg : getComputedStyle(root).getPropertyValue('--gradient-bg').trim();
-    const blendMode = computed.getPropertyValue('--canvas-complex-blend-mode').trim() || getComputedStyle(root).getPropertyValue('--gradient-blend-mode').trim();
-    
+    const gradientBg =
+      canvasBg && canvasBg !== 'none'
+        ? canvasBg
+        : getComputedStyle(root).getPropertyValue('--gradient-bg').trim();
+    const blendMode =
+      computed.getPropertyValue('--canvas-complex-blend-mode').trim() ||
+      getComputedStyle(root).getPropertyValue('--gradient-blend-mode').trim();
+
     const width = canvasElt.width;
     const height = canvasElt.height;
 
     const gradientCanvas = await p.gradientToPng(gradientBg, width, height, blendMode);
-    
+
     const compositeCanvas = document.createElement('canvas');
     compositeCanvas.width = width;
     compositeCanvas.height = height;
     const ctx = compositeCanvas.getContext('2d');
-    
+
     ctx.drawImage(gradientCanvas, 0, 0);
     ctx.drawImage(canvasElt, 0, 0);
 
@@ -265,7 +287,7 @@ export default function initCapture(p, options = {}) {
           p.capturedFrames.push({
             blob,
             frameNumber: frameNum,
-            filename: `${p.captureFilePrefix}_${p.nf(frameNum, 5)}.png`
+            filename: `${p.captureFilePrefix}_${p.nf(frameNum, 5)}.png`,
           });
         }
         resolve();
