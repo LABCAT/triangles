@@ -26,7 +26,6 @@ jobs:
       # Neuter workspace/postinstall to allow standalone GPR install
       - run: |
           rm -f pnpm-workspace.yaml
-          sed -i '/"postinstall":/d' package.json
           rm -f pnpm-lock.yaml
       - run: pnpm install
       - name: Verify @labcat/astro-animations
