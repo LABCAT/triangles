@@ -1,27 +1,52 @@
 name: Deploy to GitHub Pages
 
 on:
-  # Trigger the workflow every time you push to the `main` branch
-  # Using a different branch name? Replace `main` with your branch's name
   push:
-    branches: [ main ]
-  # Allows you to run this workflow manually from the Actions tab on GitHub.
+    branches: [main]
   workflow_dispatch:
 
-# Allow this job to clone the repo and create a page deployment
 permissions:
   contents: read
   pages: write
   id-token: write
+  packages: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout your repository using git
-        uses: actions/checkout@v5
-      - name: Install, build, and upload your site
-        uses: withastro/action@v6
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+      # Neuter workspace/postinstall to allow standalone GPR install
+      - run: |
+          rm -f pnpm-workspace.yaml
+          sed -i '/"postinstall":/d' package.json
+          rm -f pnpm-lock.yaml
+      - run: pnpm install
+      - name: Verify @labcat/astro-animations
+        run: |
+          node --input-type=module -e "
+          import * as v from '@labcat/astro-animations/vite';
+          import { readFileSync } from 'node:fs';
+          import { createRequire } from 'node:module';
+          const require = createRequire(import.meta.url);
+          const dir = require.resolve('@labcat/astro-animations/vite').replace(/src\/vite\.mjs$/, '');
+          const pkg = JSON.parse(readFileSync(dir + 'package.json', 'utf8'));
+          if (typeof v.astroAnimationsViteConfig !== 'function') {
+            throw new Error('missing astroAnimationsViteConfig in ' + pkg.version);
+          }
+          console.log('ok', pkg.name, pkg.version);
+          "
+      - run: pnpm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
 
   deploy:
     needs: build
