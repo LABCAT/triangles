@@ -2,6 +2,11 @@ import p5 from 'p5';
 import '@lib/p5.audioReact.js';
 import ColorGenerator from '@lib/p5.colorGenerator.js';
 import { drawSierpinskiLevel } from '@sketches/functions/drawSierpinski.js';
+import {
+  installFullScreenBg,
+  randomizeFullScreenBg,
+  setFullScreenOverlayOpacity,
+} from '@sketches/functions/fullScreenBackground.js';
 
 const base = import.meta.env.BASE_URL || './';
 const audioUrl = base + 'audio/TrianglesNo2.mp3';
@@ -19,6 +24,8 @@ const sketch = (p) => {
   p.fftTriColor = null;
   p.sierpDepth = 0;
   p.punch = 0;
+  // recipes/note-envelopes.md pattern — tweaked for 4.35s drones to become visible faster (was staying dark)
+  p.fullScreenEnvelope = { active: false, startTime: 0, duration: 0, startVal: 0.75, endVal: 0.02 };
 
   const randomizeFftTriColor = () => {
     const colorGen = new ColorGenerator(p, p.color(p.random(360), 92, 94));
@@ -26,10 +33,18 @@ const sketch = (p) => {
   };
 
   p.setup = async () => {
+    p.randomSeed(Date.now());
+    installFullScreenBg(p, { overlayOpacity: 0.18 });
+
     p.pixelDensity(1);
     p.createCanvas(window.innerWidth, window.innerHeight);
     p.angleMode(p.DEGREES);
     p.colorMode(p.HSB, 360, 100, 100, 1);
+    p.canvas.style.position = 'fixed';
+    p.canvas.style.top = '0';
+    p.canvas.style.left = '0';
+    p.canvas.style.zIndex = '1';
+    p.canvas.style.background = 'transparent';
 
     // Reuse buffers — avoids GC per frame (was new Float32Array each draw)
     p.waveSm = new Float32Array(1024);
@@ -40,7 +55,10 @@ const sketch = (p) => {
     await p.loadSong(audioUrl, midiUrl, (data) => {
       p.midiPpq = data.header.ppq;
       p.midiBpm = 100;
+      p.PPQ = data.header.ppq;
+      p.bpm = 100;
       p.scheduleCueSet(data.tracks[10]?.notes ?? [], 'executeTrack10');
+      p.scheduleCueSet(data.tracks[7]?.notes ?? [], 'executeTrack7');
     });
 
     p.fft = new p5.FFT();
@@ -52,7 +70,18 @@ const sketch = (p) => {
   };
 
   p.draw = () => {
-    p.background(0);
+    // recipes/note-envelopes.md base + ease-out so 4.35s drones become visible quickly
+    if (p.fullScreenEnvelope.active) {
+      const nowSec = p.getSongPlaybackTime?.() ?? 0;
+      const elapsed = nowSec * 1000 - p.fullScreenEnvelope.startTime;
+      const progress = p.constrain(elapsed / (p.fullScreenEnvelope.duration || 1), 0, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic — 25% in = 58% faded
+      const currentVal = p.lerp(p.fullScreenEnvelope.startVal, p.fullScreenEnvelope.endVal, eased);
+      setFullScreenOverlayOpacity(p, currentVal);
+      if (progress >= 1) p.fullScreenEnvelope.active = false;
+    }
+
+    p.clear();
 
     if (!p.fft || !p.fftTriColor) return;
 
@@ -129,6 +158,20 @@ const sketch = (p) => {
     randomizeFftTriColor();
     p.punch = 1;
     // console.log(`  -> NEW LAYER depth ${finalDepth} triCount ${triCount} hue ${Math.round(p.hue(p.fftTriColor))} punch 1`);
+  };
+
+  p.executeTrack7 = function (note) {
+    // console.log('[Track7]', { cue: note.currentCue, midi: note.midi, name: note.name, time: note.time.toFixed(3), ticks: note.ticks, duration: note.duration?.toFixed(3), durationTicks: note.durationTicks });
+    randomizeFullScreenBg(p);
+    const { durationTicks } = note;
+    const durationSec = (durationTicks / p.PPQ) * (60 / p.bpm);
+    p.fullScreenEnvelope.active = true;
+    p.fullScreenEnvelope.startTime = p.getSongPlaybackTime() * 1000;
+    p.fullScreenEnvelope.duration = durationSec * 1000;
+    p.fullScreenEnvelope.startVal = 0.75;
+    p.fullScreenEnvelope.endVal = 0.02;
+    setFullScreenOverlayOpacity(p, 0.75);
+    // console.log(`  -> envelope 0.75->0.02 cubic-out over ${p.fullScreenEnvelope.duration.toFixed(0)}ms ticks:${durationTicks}`);
   };
 
   p.mouseClicked = () => {
