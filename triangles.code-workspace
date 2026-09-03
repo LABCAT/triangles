@@ -1,0 +1,22 @@
+{
+  "folders": [
+    { "name": "triangles", "path": "." },
+    {
+      "name": "@labcat/astro-animations",
+      "path": "../animations.labcat.nz/packages/astro-animations"
+    },
+    {
+      "name": "@labcat/audio-react",
+      "path": "../animations.labcat.nz/packages/audio-react"
+    },
+    {
+      "name": "@labcat/p5-capture",
+      "path": "../animations.labcat.nz/packages/p5-capture"
+    }
+  ],
+  "settings": {
+    "search.exclude": {
+      "**/node_modules": true
+    }
+  }
+}
