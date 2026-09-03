@@ -2,7 +2,7 @@ const WAVE_STEPS = 240;
 const SQ3H = Math.sqrt(3) / 2;
 
 /** Equilateral triangle, apex up; centroid at origin. */
-const TRI_UP_EDGES = [
+export const TRI_UP_EDGES = [
   { ax: 0, ay: -1, bx: SQ3H, by: 0.5, nx: SQ3H, ny: -0.5 },
   { ax: SQ3H, ay: 0.5, bx: -SQ3H, by: 0.5, nx: 0, ny: 1 },
   { ax: -SQ3H, ay: 0.5, bx: 0, by: -1, nx: -SQ3H, ny: -0.5 },
@@ -29,10 +29,14 @@ const triOutlineNormal = (edges, edgeIdx, t, isFullEdge) => {
   return { nx: e.nx, ny: e.ny };
 };
 
-const drawFftTriangleOutline = (p, waveSm, wlen, cx, cy, halfSize, baseColor, edges) => {
+export const drawFftTriangleOutline = (p, waveSm, wlen, cx, cy, halfSize, baseColor, edges) => {
   const rMax = halfSize * (0.36 / 0.22);
   const rMin = halfSize * (0.1 / 0.22);
-  const stepsPerEdge = WAVE_STEPS / edges.length;
+  // Adaptive detail: tiny sierpinski leaves don't need 240 steps / 7 glows
+  // halfSize 12 -> 14 steps, 150 -> 165 steps, 410 -> 240
+  const adaptiveSteps = Math.max(12, Math.min(240, Math.floor(halfSize * 1.1)));
+  const WAVE_STEPS_ADAPT = Math.floor(adaptiveSteps / 3) * 3;
+  const stepsPerEdge = WAVE_STEPS_ADAPT / edges.length;
   const perimeterPts = stepsPerEdge + (edges.length - 1) * (stepsPerEdge - 1);
   const h0 = p.hue(baseColor);
   const s0 = p.saturation(baseColor);
@@ -45,12 +49,20 @@ const drawFftTriangleOutline = (p, waveSm, wlen, cx, cy, halfSize, baseColor, ed
   p.strokeCap(p.SQUARE);
 
   const L = halfSize;
-  for (const layer of GLOW_LAYER_ORDER) {
+  // Stroke relative to screen area / halfSize — fixes 360x490 too-thick vs 1600x800 good
+  const refHalf = 410;
+  const scale = p.constrain(halfSize / refHalf, 0.35, 1.8);
+  const areaScale = Math.sqrt((p.width * p.height) / (1600 * 800));
+  const s = p.constrain(scale * (0.7 + 0.3 * areaScale), 0.3, 2.0);
+  // Glow layers: tiny tris only center glow (1 layer), medium 3, large 7
+  const glowOrder = halfSize < 14 ? [3] : halfSize < 32 ? [0, 3, 6] : GLOW_LAYER_ORDER;
+  for (const layer of glowOrder) {
     const distFromCenter = Math.abs(layer - GLOW_CENTER_LAYER);
     const alpha = p.map(distFromCenter, 0, GLOW_CENTER_LAYER, 0.8, 0.15);
-    p.strokeWeight(layer === GLOW_CENTER_LAYER ? 32 : 3);
+    const w = layer === GLOW_CENTER_LAYER ? 32 * s : 3 * s;
+    p.strokeWeight(Math.max(0.6, w));
     p.stroke((h0 + layer * 6) % 360, s0, b0, alpha);
-    const layerOffset = (layer - GLOW_CENTER_LAYER) * 2.2;
+    const layerOffset = (layer - GLOW_CENTER_LAYER) * 2.2 * s;
 
     let fx;
     let fy;
