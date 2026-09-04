@@ -1,5 +1,6 @@
 import p5 from 'p5';
 import '@lib/p5.audioReact.js';
+import '../lib/p5.fps.js';
 import ColorGenerator from '@lib/p5.colorGenerator.js';
 import { drawSierpinskiLevel } from '@sketches/functions/drawSierpinski.js';
 import {
@@ -35,6 +36,15 @@ const sketch = (p) => {
   p.setup = async () => {
     p.randomSeed(Date.now());
     installFullScreenBg(p, { overlayOpacity: 0.18 });
+    // FPS badge — bottom-right lab-label; on by default, ?fps=0 to hide, window.toggleFps() / press F
+    const params = new URLSearchParams(window.location.search);
+    const wantsFps = !params.has('fps') || params.get('fps') !== '0';
+    if (wantsFps) p.enableFpsIndicator();
+    window.toggleFps = () => p.toggleFpsIndicator();
+    // quick toggle key
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey) p.toggleFpsIndicator();
+    });
 
     p.pixelDensity(1);
     p.createCanvas(window.innerWidth, window.innerHeight);
