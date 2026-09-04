@@ -1,9 +1,9 @@
 import p5 from 'p5';
 import '@lib/p5.audioReact.js';
-import initCapture from '@labcat/p5-capture';
+import initCapture from '@labcat2020/p5.audioreactive-capture';
 import ColorGenerator from '@lib/p5.colorGenerator.js';
-import { createDomLayerCaptureBackground } from '@labcat/p5-capture/dom-layer';
-import { compositeDomCaptureExtension } from '@labcat/p5-capture/composite';
+import { createDomLayerCaptureBackground } from '@labcat2020/p5.audioreactive-capture/dom-layer';
+import { compositeDomCaptureExtension } from '@labcat2020/p5.audioreactive-capture/composite';
 import {
   installFourSegmentBg,
   randomizeFourSegmentBg,

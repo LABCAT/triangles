@@ -9,34 +9,30 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  packages: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://npm.pkg.github.com
-      - name: Prep CI (Auth & Workspace)
+          registry-url: https://registry.npmjs.org
+      - name: Prep CI (Workspace)
         run: |
           printf "packages:\n  - .\nallowBuilds:\n  '@parcel/watcher': true\n  esbuild: true\n  sharp: true\n" > pnpm-workspace.yaml
           rm -f pnpm-lock.yaml
-          pnpm config set "//npm.pkg.github.com/:_authToken" ${NODE_AUTH_TOKEN}
       - run: pnpm install
-      - name: Verify @labcat/astro-animations
+      - name: Verify @labcat2020/animation-lab
         run: |
           node --input-type=module -e "
-          import * as v from '@labcat/astro-animations/vite';
+          import * as v from '@labcat2020/animation-lab/vite';
           import { readFileSync } from 'node:fs';
           import { createRequire } from 'node:module';
           const require = createRequire(import.meta.url);
-          const dir = require.resolve('@labcat/astro-animations/vite').replace(/src\/vite\.mjs$/, '');
+          const dir = require.resolve('@labcat2020/animation-lab/vite').replace(/src\/vite\.mjs$/, '');
           const pkg = JSON.parse(readFileSync(dir + 'package.json', 'utf8'));
           if (typeof v.astroAnimationsViteConfig !== 'function') {
             throw new Error('missing astroAnimationsViteConfig in ' + pkg.version);

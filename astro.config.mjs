@@ -1,6 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
-import { astroAnimationsScssPrepend, astroAnimationsViteAliases, astroAnimationsViteConfig } from '@labcat/astro-animations/vite';
+import { astroAnimationsScssPrepend, astroAnimationsViteAliases, astroAnimationsViteConfig } from '@labcat2020/animation-lab/vite';
 
 // https://astro.build/config
 export default defineConfig({
