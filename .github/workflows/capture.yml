@@ -1,14 +1,14 @@
 # Capture — headless Chromium (Playwright) → per-frame R2 via @labcat2020/p5.audioreactive-capture-cli (labcat-capture)
 #
-# Workflow: test 100 → approve → full (audio length), no frames param for full, portrait/landscape separate jobs for retry isolation.
+# Workflow: test 100 → approve → full (audio length), no frames param for full, single orient per dispatch.
 #
 # Usage (founder approval between stages per PIPELINE.md):
 #   1) Test ~100 frames to temp R2 (founder reviews before full):
-#      dispatch with sketch=TrianglesNo1 frames=100 orient=portrait r2Prefix=captures-test/2026-09-06/TrianglesNo1-portrait
-#      → uploads each frame to R2 as written (no ZIP). Review via wrangler r2 object list <bucket> --prefix "<r2Prefix>/"
+#      dispatch with sketch=TrianglesNo1 frames=100 orient=portrait r2Prefix=temp/TrianglesNo1
+#      → uploads each frame to R2 as written (no ZIP). Review via https://images.labcat.nz/<r2Prefix>/portrait/index.html
 #   2) Founder reviews → full run after approval (audio-length default):
-#      dispatch with sketch=TrianglesNo1 r2Prefix=captures/TrianglesNo1  (omit --frames for full → audio duration @60fps)
-#      → portrait + landscape are separate matrix jobs for retry isolation (fail-fast: false, re-run single orient if needed)
+#      dispatch with sketch=TrianglesNo1 orient=portrait r2Prefix=captures/TrianglesNo1  (omit --frames for full → audio duration @60fps)
+#      dispatch with sketch=TrianglesNo1 orient=landscape r2Prefix=captures/TrianglesNo1  (separate dispatch per orient)
 #
 # Invariants (additive over ZIP fallback):
 #   - No ?exporting flag, no Socket.io, no toDataURL wire, no frameRate(2) live loop
@@ -61,12 +61,8 @@ permissions:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    # Full run: portrait + landscape are separate jobs for retry isolation (fail-fast false).
-    # Test ~100 frames can be dispatched with frames=100; re-run/ retry single orient via GitHub retry of that matrix leg.
-    strategy:
-      fail-fast: false
-      matrix:
-        orient: [portrait, landscape]
+    # Single-orient per dispatch — dispatch once per orient (portrait 1080x1920, landscape 1920x1080).
+    # Full capture = two dispatches (portrait + landscape) -> https://images.labcat.nz/<prefix>/portrait/index.html etc.
     env:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -100,15 +96,15 @@ jobs:
       - name: Show capture CLI help (sanity)
         run: npx --yes @labcat2020/p5.audioreactive-capture-cli --help
 
-      - name: Capture ${{ inputs.sketch }} ${{ matrix.orient }} ${{ inputs.frames != '' && format('--frames {0}', inputs.frames) || '(full audio length)' }}
+      - name: Capture ${{ inputs.sketch }} ${{ inputs.orient }} ${{ inputs.frames != '' && format('--frames {0}', inputs.frames) || '(full audio length)' }}
         run: |
           set -euo pipefail
-          # Normalize r2Prefix to base without trailing orient, then append matrix orient.
+          # Normalize r2Prefix to base without trailing orient, then append selected orient.
           # Handles both `temp/TrianglesNo2` and `temp/TrianglesNo2/portrait` inputs correctly.
           R2_PREFIX_INPUT="${{ inputs.r2Prefix }}"
           R2_PREFIX_BASE=$(echo "$R2_PREFIX_INPUT" | sed -E 's#/(portrait|landscape)$##')
-          R2_PREFIX="$R2_PREFIX_BASE/${{ matrix.orient }}"
-          echo "::group::Capture ${{ inputs.sketch }} ${{ matrix.orient }} frames=${{ inputs.frames || 'full' }} prefix=$R2_PREFIX (from input ${{ inputs.r2Prefix }})"
+          R2_PREFIX="$R2_PREFIX_BASE/${{ inputs.orient }}"
+          echo "::group::Capture ${{ inputs.sketch }} ${{ inputs.orient }} frames=${{ inputs.frames || 'full' }} prefix=$R2_PREFIX (from input ${{ inputs.r2Prefix }})"
 
           # --frames omission → full audio length @60fps (audio duration default). Pass --frames 100 only for test.
           FRAMES_FLAG=""
@@ -130,7 +126,7 @@ jobs:
           npx --yes @labcat2020/p5.audioreactive-capture-cli \
             --repo . \
             --sketch "${{ inputs.sketch }}" \
-            --orient "${{ matrix.orient }}" \
+            --orient "${{ inputs.orient }}" \
             --r2-prefix "$R2_PREFIX" \
             $FRAMES_FLAG $DRY_RUN
 
@@ -140,7 +136,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: capture-${{ inputs.sketch }}-${{ matrix.orient }}-${{ github.run_id }}
+          name: capture-${{ inputs.sketch }}-${{ inputs.orient }}-${{ github.run_id }}
           path: capture-out/
           if-no-files-found: ignore
           retention-days: 7
