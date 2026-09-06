@@ -103,7 +103,12 @@ jobs:
       - name: Capture ${{ inputs.sketch }} ${{ matrix.orient }} ${{ inputs.frames != '' && format('--frames {0}', inputs.frames) || '(full audio length)' }}
         run: |
           set -euo pipefail
-          echo "::group::Capture ${{ inputs.sketch }} ${{ matrix.orient }} frames=${{ inputs.frames || 'full' }} prefix=${{ inputs.r2Prefix }}/${{ matrix.orient }}"
+          # Normalize r2Prefix to base without trailing orient, then append matrix orient.
+          # Handles both `temp/TrianglesNo2` and `temp/TrianglesNo2/portrait` inputs correctly.
+          R2_PREFIX_INPUT="${{ inputs.r2Prefix }}"
+          R2_PREFIX_BASE=$(echo "$R2_PREFIX_INPUT" | sed -E 's|/(portrait|landscape)$||')
+          R2_PREFIX="$R2_PREFIX_BASE/${{ matrix.orient }}"
+          echo "::group::Capture ${{ inputs.sketch }} ${{ matrix.orient }} frames=${{ inputs.frames || 'full' }} prefix=$R2_PREFIX (from input ${{ inputs.r2Prefix }})"
 
           # --frames omission → full audio length @60fps (audio duration default). Pass --frames 100 only for test.
           FRAMES_FLAG=""
@@ -117,16 +122,16 @@ jobs:
             DRY_RUN="--dry-run"
             echo "::notice::R2 creds missing — using --dry-run fallback to capture-out/ + gallery/index.html"
           else
-            echo "R2 enabled: bucket=${R2_BUCKET} account=${R2_ACCOUNT_ID:0:4}… prefix=${{ inputs.r2Prefix }}/${{ matrix.orient }}"
+            echo "R2 enabled: bucket=${R2_BUCKET} account=${R2_ACCOUNT_ID:0:4}… prefix=$R2_PREFIX"
           fi
 
           # Explicit viewport per orient via CLI's --orient; no sibling checkout, no preview URL — builds inside own repo (--repo .)
-          # Keep p5.capture.js ZIP fallback intact: CLI sets p.captureSkipDownload + captureOnFrame/window.__labcatOnFrameBlob → toBlob → R2 (additive)
+          # Keep p5.capture.js ZIP fallback intact: CLI sets p.captureSkipDownload + captureOnFrame/window.__audioReactOnFrameBlob → toBlob → R2 (additive)
           npx --yes @labcat2020/p5.audioreactive-capture-cli \
             --repo . \
             --sketch "${{ inputs.sketch }}" \
             --orient "${{ matrix.orient }}" \
-            --r2-prefix "${{ inputs.r2Prefix }}/${{ matrix.orient }}" \
+            --r2-prefix "$R2_PREFIX" \
             $FRAMES_FLAG $DRY_RUN
 
           echo "::endgroup::"
