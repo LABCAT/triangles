@@ -106,7 +106,7 @@ jobs:
           # Normalize r2Prefix to base without trailing orient, then append matrix orient.
           # Handles both `temp/TrianglesNo2` and `temp/TrianglesNo2/portrait` inputs correctly.
           R2_PREFIX_INPUT="${{ inputs.r2Prefix }}"
-          R2_PREFIX_BASE=$(echo "$R2_PREFIX_INPUT" | sed -E 's|/(portrait|landscape)$||')
+          R2_PREFIX_BASE=$(echo "$R2_PREFIX_INPUT" | sed -E 's#/(portrait|landscape)$##')
           R2_PREFIX="$R2_PREFIX_BASE/${{ matrix.orient }}"
           echo "::group::Capture ${{ inputs.sketch }} ${{ matrix.orient }} frames=${{ inputs.frames || 'full' }} prefix=$R2_PREFIX (from input ${{ inputs.r2Prefix }})"
 
