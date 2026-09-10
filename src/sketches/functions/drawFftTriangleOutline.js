@@ -16,6 +16,84 @@ const normalize2 = (x, y) => {
   return { nx: x / len, ny: y / len };
 };
 
+// Glow config for one draw call — stroke color/weight/offset depends only on
+// baseColor + layer + halfSize, identical for every leaf. Computed once and
+// reused across all leaves instead of allocating a p5.Color per leaf (243 leaves
+// x 7 layers was ~1700 color objects + stroke state changes per frame).
+const computeGlowSpec = (p, halfSize, baseColor) => {
+  const h0 = p.hue(baseColor);
+  const s0 = p.saturation(baseColor);
+  const b0 = p.brightness(baseColor);
+  // Adaptive detail: tiny sierpinski leaves don't need 240 steps / 7 glows
+  // halfSize 12 -> 14 steps, 150 -> 165 steps, 410 -> 240
+  const adaptiveSteps = Math.max(12, Math.min(240, Math.floor(halfSize * 1.1)));
+  const steps = Math.floor(adaptiveSteps / 3) * 3;
+  // Stroke relative to screen area / halfSize — fixes 360x490 too-thick vs 1600x800 good
+  const refHalf = 410;
+  const scale = p.constrain(halfSize / refHalf, 0.35, 1.8);
+  const areaScale = Math.sqrt((p.width * p.height) / (1600 * 800));
+  const s = p.constrain(scale * (0.7 + 0.3 * areaScale), 0.3, 2.0);
+  // Glow layers: tiny tris only center glow (1 layer), medium 3, large 7
+  const glowOrder = halfSize < 14 ? [3] : halfSize < 32 ? [0, 3, 6] : GLOW_LAYER_ORDER;
+  return glowOrder.map((layer) => {
+    const distFromCenter = Math.abs(layer - GLOW_CENTER_LAYER);
+    const alpha = p.map(distFromCenter, 0, GLOW_CENTER_LAYER, 0.8, 0.15);
+    const weight = Math.max(0.6, layer === GLOW_CENTER_LAYER ? 32 * s : 3 * s);
+    const offset = (layer - GLOW_CENTER_LAYER) * 2.2 * s;
+    return { layer, color: p.color((h0 + layer * 6) % 360, s0, b0, alpha), weight, offset, steps };
+  });
+};
+
+// Draws the perimeter of ONE leaf for ONE glow layer. Stroke/blend state is set
+// by the caller once per layer; this only emits lines (absolute coords, no save()).
+const drawLeafLayer = (p, waveSm, wlen, cx, cy, halfSize, edges, spec) => {
+  const rMax = halfSize * (0.36 / 0.22);
+  const rMinEdge = halfSize * (0.1 / 0.22) * 0.12;
+  const stepsPerEdge = spec.steps / edges.length;
+  const perimeterPts = stepsPerEdge + (edges.length - 1) * (stepsPerEdge - 1);
+  const wScale = (wlen - 1) / (perimeterPts - 1);
+  const L = halfSize;
+  const { offset } = spec;
+
+  let fx;
+  let fy;
+  let px0;
+  let py0;
+  let idx = 0;
+  for (let e = 0; e < edges.length; e++) {
+    const { ax, ay, bx, by } = edges[e];
+    const full = e === 0;
+    const sMax = full ? stepsPerEdge : stepsPerEdge - 1;
+    for (let s = 0; s < sMax; s++) {
+      const t = full ? s / (stepsPerEdge - 1) : (s + 1) / (stepsPerEdge - 1);
+      const px = ax + (bx - ax) * t;
+      const py = ay + (by - ay) * t;
+      const atCorner =
+        (e === 0 && (s === 0 || s === stepsPerEdge - 1)) || (e > 0 && s === sMax - 1);
+      const { nx: nnx, ny: nny } = triOutlineNormal(edges, e, t, full);
+      const wi = Math.min(wlen - 1, Math.floor(idx * wScale));
+      idx++;
+      const wv = waveSm[wi] ?? 0;
+      const env = Math.abs(wv);
+      const waveDisp = atCorner ? 0 : rMinEdge + env * (rMax - rMinEdge);
+      const totalDisp = waveDisp + offset;
+      const x = cx + px * L + nnx * totalDisp;
+      const y = cy + py * L + nny * totalDisp;
+      if (idx === 1) {
+        fx = x;
+        fy = y;
+        px0 = x;
+        py0 = y;
+      } else {
+        p.line(px0, py0, x, y);
+        px0 = x;
+        py0 = y;
+      }
+    }
+  }
+  p.line(px0, py0, fx, fy);
+};
+
 const triOutlineNormal = (edges, edgeIdx, t, isFullEdge) => {
   const e = edges[edgeIdx];
   const prev = edges[(edgeIdx + 2) % 3];
@@ -30,85 +108,25 @@ const triOutlineNormal = (edges, edgeIdx, t, isFullEdge) => {
 };
 
 export const drawFftTriangleOutline = (p, waveSm, wlen, cx, cy, halfSize, baseColor, edges) => {
-  const rMax = halfSize * (0.36 / 0.22);
-  const rMin = halfSize * (0.1 / 0.22);
-  // Adaptive detail: tiny sierpinski leaves don't need 240 steps / 7 glows
-  // halfSize 12 -> 14 steps, 150 -> 165 steps, 410 -> 240
-  const adaptiveSteps = Math.max(12, Math.min(240, Math.floor(halfSize * 1.1)));
-  const WAVE_STEPS_ADAPT = Math.floor(adaptiveSteps / 3) * 3;
-  const stepsPerEdge = WAVE_STEPS_ADAPT / edges.length;
-  const perimeterPts = stepsPerEdge + (edges.length - 1) * (stepsPerEdge - 1);
-  const h0 = p.hue(baseColor);
-  const s0 = p.saturation(baseColor);
-  const b0 = p.brightness(baseColor);
+  const specs = computeGlowSpec(p, halfSize, baseColor);
 
   p.push();
-  p.translate(cx, cy);
   p.blendMode(p.ADD);
   p.noFill();
   p.strokeCap(p.SQUARE);
-
-  const L = halfSize;
-  // Stroke relative to screen area / halfSize — fixes 360x490 too-thick vs 1600x800 good
-  const refHalf = 410;
-  const scale = p.constrain(halfSize / refHalf, 0.35, 1.8);
-  const areaScale = Math.sqrt((p.width * p.height) / (1600 * 800));
-  const s = p.constrain(scale * (0.7 + 0.3 * areaScale), 0.3, 2.0);
-  // Glow layers: tiny tris only center glow (1 layer), medium 3, large 7
-  const glowOrder = halfSize < 14 ? [3] : halfSize < 32 ? [0, 3, 6] : GLOW_LAYER_ORDER;
-  for (const layer of glowOrder) {
-    const distFromCenter = Math.abs(layer - GLOW_CENTER_LAYER);
-    const alpha = p.map(distFromCenter, 0, GLOW_CENTER_LAYER, 0.8, 0.15);
-    const w = layer === GLOW_CENTER_LAYER ? 32 * s : 3 * s;
-    p.strokeWeight(Math.max(0.6, w));
-    p.stroke((h0 + layer * 6) % 360, s0, b0, alpha);
-    const layerOffset = (layer - GLOW_CENTER_LAYER) * 2.2 * s;
-
-    let fx;
-    let fy;
-    let px0;
-    let py0;
-    let idx = 0;
-    for (let e = 0; e < edges.length; e++) {
-      const { ax, ay, bx, by } = edges[e];
-      const full = e === 0;
-      const sMax = full ? stepsPerEdge : stepsPerEdge - 1;
-      for (let s = 0; s < sMax; s++) {
-        const t = full ? s / (stepsPerEdge - 1) : (s + 1) / (stepsPerEdge - 1);
-        const px = p.lerp(ax, bx, t);
-        const py = p.lerp(ay, by, t);
-        const atCorner =
-          (e === 0 && (s === 0 || s === stepsPerEdge - 1)) || (e > 0 && s === sMax - 1);
-        const { nx: nnx, ny: nny } = triOutlineNormal(edges, e, t, full);
-        const wi = p.floor(p.map(idx, 0, perimeterPts - 1, 0, wlen - 1));
-        idx++;
-        const wv = waveSm[wi] ?? 0;
-        const env = p.constrain(Math.abs(wv), 0, 1);
-        const waveDisp = atCorner ? 0 : p.map(env, 0, 1, rMin * 0.12, rMax);
-        const totalDisp = waveDisp + layerOffset;
-        const x = px * L + nnx * totalDisp;
-        const y = py * L + nny * totalDisp;
-        if (idx === 1) {
-          fx = x;
-          fy = y;
-          px0 = x;
-          py0 = y;
-        } else {
-          p.line(px0, py0, x, y);
-          px0 = x;
-          py0 = y;
-        }
-      }
-    }
-    p.line(px0, py0, fx, fy);
+  for (const spec of specs) {
+    p.strokeWeight(spec.weight);
+    p.stroke(spec.color);
+    drawLeafLayer(p, waveSm, wlen, cx, cy, halfSize, edges, spec);
   }
-
   p.blendMode(p.BLEND);
   p.pop();
 };
 
 /** Vertical offset from cell center to top sub-triangle centroid (bbox center ≈ 0.5). */
 const CLUSTER_CENTROID_Y = 0.5;
+
+export { drawLeafLayer, computeGlowSpec };
 
 /** Three apex-up equilateral triangles forming one larger triangle, centered at (cx, cy). */
 export const drawFftTriangleCluster = (p, waveSm, wlen, cx, cy, halfSize, baseColor) => {

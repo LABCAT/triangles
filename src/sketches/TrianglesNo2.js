@@ -35,8 +35,9 @@ const sketch = (p) => {
   p.filterCC = null;
   p.drumColorA = null;
   p.drumColorB = null;
-  // recipes/note-envelopes.md pattern — tweaked for 4.35s drones to become visible faster (was staying dark)
-  p.fullScreenEnvelope = { active: false, startTime: 0, duration: 0, startVal: 0.75, endVal: 0.02 };
+  // recipes/note-envelopes.md pattern — tweaked for dramatic wash: slam near-black, hold for impact,
+  // then snap open (ease-out quart) so most of the 4.35s drone shows the wild gradient.
+  p.fullScreenEnvelope = { active: false, startTime: 0, duration: 0, startVal: 0.92, endVal: 0.02, hold: 0.16 };
 
   const randomizeFftTriColor = () => {
     const colorGen = new ColorGenerator(p, p.color(p.random(360), 92, 94));
@@ -114,13 +115,20 @@ const sketch = (p) => {
   };
 
   p.draw = () => {
-    // recipes/note-envelopes.md base + ease-out so 4.35s drones become visible quickly
+    // recipes/note-envelopes.md base — big punchy wash: black-out hit, brief hold, snappy reveal
     if (p.fullScreenEnvelope.active) {
       const nowSec = p.getSongPlaybackTime?.() ?? 0;
       const elapsed = nowSec * 1000 - p.fullScreenEnvelope.startTime;
       const progress = p.constrain(elapsed / (p.fullScreenEnvelope.duration || 1), 0, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic — 25% in = 58% faded
-      const currentVal = p.lerp(p.fullScreenEnvelope.startVal, p.fullScreenEnvelope.endVal, eased);
+      const hold = p.fullScreenEnvelope.hold ?? 0;
+      let currentVal;
+      if (progress < hold) {
+        currentVal = p.fullScreenEnvelope.startVal; // slam to peak and hold for impact
+      } else {
+        const t = (progress - hold) / Math.max(1e-6, 1 - hold);
+        const eased = 1 - Math.pow(1 - t, 4); // ease-out quart — reveal punches open fast
+        currentVal = p.lerp(p.fullScreenEnvelope.startVal, p.fullScreenEnvelope.endVal, eased);
+      }
       setFullScreenOverlayOpacity(p, currentVal);
       if (progress >= 1) p.fullScreenEnvelope.active = false;
     }
@@ -278,10 +286,11 @@ const sketch = (p) => {
     p.fullScreenEnvelope.active = true;
     p.fullScreenEnvelope.startTime = p.getSongPlaybackTime() * 1000;
     p.fullScreenEnvelope.duration = durationSec * 1000;
-    p.fullScreenEnvelope.startVal = 0.75;
+    p.fullScreenEnvelope.startVal = 0.92;
     p.fullScreenEnvelope.endVal = 0.02;
-    setFullScreenOverlayOpacity(p, 0.75);
-    // console.log(`  -> envelope 0.75->0.02 cubic-out over ${p.fullScreenEnvelope.duration.toFixed(0)}ms ticks:${durationTicks}`);
+    p.fullScreenEnvelope.hold = 0.16;
+    setFullScreenOverlayOpacity(p, 0.92);
+    // console.log(`  -> envelope 0.92->0.02 quart-out (hold ${p.fullScreenEnvelope.hold}) over ${p.fullScreenEnvelope.duration.toFixed(0)}ms ticks:${durationTicks}`);
   };
 
   p.mouseClicked = () => {

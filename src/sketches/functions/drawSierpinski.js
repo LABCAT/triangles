@@ -1,4 +1,4 @@
-import { drawFftTriangleOutline, TRI_UP_EDGES } from './drawFftTriangleOutline.js';
+import { drawFftTriangleOutline, drawLeafLayer, computeGlowSpec, TRI_UP_EDGES } from './drawFftTriangleOutline.js';
 
 const SQ3H = Math.sqrt(3) / 2;
 
@@ -30,7 +30,29 @@ const drawRecursive = (p, waveSm, wlen, cx, cy, halfSize, baseColor, depth) => {
 
 export const drawSierpinskiLevel = (p, waveSm, wlen, cx, cy, halfSize, baseColor, depth) => {
   const d = Math.max(0, Math.min(5, Math.floor(depth)));
-  drawRecursive(p, waveSm, wlen, cx, cy, halfSize, baseColor, d);
+  // All leaves of a given depth share the same halfSize, so the glow spec
+  // (stroke color/weight/offset) is computed ONCE per draw call and all leaves
+  // are drawn per-layer — no stroke state churn or p5.Color churn per leaf.
+  const leafHalf = halfSize / Math.pow(2, d);
+  const specs = computeGlowSpec(p, leafHalf, baseColor);
+  const leaves = [];
+  if (d === 0) leaves.push({ cx, cy, halfSize: leafHalf });
+  else collectLeaves(cx, cy, halfSize, d, leaves);
+  if (!leaves.length) return;
+
+  p.push();
+  p.blendMode(p.ADD);
+  p.noFill();
+  p.strokeCap(p.SQUARE);
+  for (const spec of specs) {
+    p.strokeWeight(spec.weight);
+    p.stroke(spec.color);
+    for (const leaf of leaves) {
+      drawLeafLayer(p, waveSm, wlen, leaf.cx, leaf.cy, leaf.halfSize, TRI_UP_EDGES, spec);
+    }
+  }
+  p.blendMode(p.BLEND);
+  p.pop();
 };
 
 export const drawSierpinskiProgressive = (p, waveSm, wlen, cx, cy, halfSize, baseColor, depth, leavesToShow) => {
