@@ -41,6 +41,7 @@ export const drawSierpinskiProgressive = (p, waveSm, wlen, cx, cy, halfSize, bas
   }
   const leaves = [];
   collectLeaves(cx, cy, halfSize, d, leaves);
+  if (!leaves.length) return;
   const total = leaves.length;
   const n = Math.max(1, Math.min(total, Math.floor(leavesToShow)));
   for (let i = 0; i < n; i++) {
