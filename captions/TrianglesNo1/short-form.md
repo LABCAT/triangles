@@ -1,13 +1,3 @@
-# #Triangles
-
-Creative coding experiments exploring audio-reactive visualizations through triangular form.
-
-Follow on Instagram → https://www.instagram.com/labcat2020/
-
-## #TrianglesNo1
-
-https://triangles.labcat.nz/number-1/
-
 ⚡ Color hits like a live wire. 🔌
 
 TrianglesNo1 — four corner clusters snap and surge; #Chromatic heat rewires the frame on every hit 🌈💥 while #Electric #Funk current keeps the pulse live 🎧✨
