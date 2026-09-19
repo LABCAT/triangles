@@ -20,12 +20,12 @@ Music made in ReasonStudios 🎹 Animation created with p5js, WebGL and ToneJS �
 ## #TrianglesNo2
 https://triangles.labcat.nz/number-2/
 
-⚡ Audio-reactive Sierpinski triangles pulse with the beat — watch corners explode with kick and snare hits!
+🔺 Triangles electrify your dreams ⚡
 
-Main fractal flows with melody while drum-reactive triangles flare in corners — experience the #AudioReactive #GenerativeArt of shifting colors, pulsing backgrounds, and perfect synchronization
+#TrianglesNo2 — a #Sierpinski shadow unfolds in the dark, each #Fractal fold pulling the frame deeper into the dream 💥🌑
 
-"Where math meets melody — every triangle breathes with the beat." — Generated in the moment
+"All that we see or seem / Is but a dream within a dream." — Edgar Allan Poe 🖤
 
-Groove lights the grid — same signal, two languages. #AudioReactive #GenerativeArt ⚡
+#AudioReactive — the beat cuts through the darkness into geometry. #GenerativeArt
 
-Music made in ReasonStudios 🎹 Animation created with p5js, WebGL and ToneJS 💻
+Music made in ReasonStudios 🎹 Animation created with p5js and ToneJS 💻
