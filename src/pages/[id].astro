@@ -12,7 +12,7 @@ export async function getStaticPaths() {
 const { sketchInfo } = Astro.props;
 ---
 
-<SketchLayout title={sketchInfo.title} description={sketchInfo.description} />
+<SketchLayout title={sketchInfo.title} description={sketchInfo.description} header={true} />
 
 <script>
   const sketches = {
