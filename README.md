@@ -29,3 +29,8 @@ https://triangles.labcat.nz/number-2/
 #AudioReactive — the beat cuts through the darkness into geometry. #GenerativeArt
 
 Music made in ReasonStudios 🎹 Animation created with p5js and ToneJS 💻
+
+## #TrianglesNo3
+https://triangles.labcat.nz/number-3/
+
+A full-screen cascade of translucent, color-layered triangles.

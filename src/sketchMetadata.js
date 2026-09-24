@@ -8,6 +8,11 @@ export const sketchMetadata = {
     title: '#TrianglesNo2',
     description: 'Four corner clusters, chromatic heat.',
     sketch: 'TrianglesNo2.js',
+  },
+  'number-3': {
+    title: '#TrianglesNo3',
+    description: 'A full-screen cascade of translucent, color-layered triangles.',
+    sketch: 'TrianglesNo3.js',
   }
 };
 
