@@ -13,8 +13,20 @@ const audioUrl = base + 'audio/TrianglesNo3.mp3';
 const midiUrl = base + 'audio/TrianglesNo3.mid';
 const INITIAL_SHAPE_SIZE = 60;
 const FILL_ALPHA = 63;
+// Inner-triangle outlines are lifted to full brightness while keeping their hue
+// (scale the channels so the strongest one hits max) — brighter, never washed white.
+const STROKE_TARGET = 255;
+// Inner outlines were 1px and vanished into the glow; a bolder line carries the
+// vivid hue without needing to wash it white.
+const INNER_STROKE = 2.2;
 const CUE_TRACK = 1;
 const MIDI_BPM = 114;
+
+// Geometry is sized off the short axis so the figure reads the same on every
+// device and never overflows the narrow side (portrait = width). 1080p is the
+// reference look: scale is exactly 1 there.
+const REFERENCE_MIN = 1080;
+const screenScale = (p) => Math.min(p.width, p.height) / REFERENCE_MIN;
 
 const shuffle = (items, p) => {
   for (let index = items.length - 1; index > 0; index -= 1) {
@@ -26,13 +38,17 @@ const shuffle = (items, p) => {
 
 const createTriangleGroups = (p, shapeSize) => {
   const groups = [];
+  // Unit is the design shape size scaled to the short axis; the 4.5x step puts
+  // ~4 cells across the short side at the 60px base (portrait => ~4 columns).
+  const unit = shapeSize * screenScale(p);
+  const step = unit * 4.5;
 
-  for (let x = 0; x < p.width + shapeSize; x += shapeSize * 4.5) {
-    for (let y = 0; y < p.height + shapeSize; y += shapeSize * 4.5) {
+  for (let x = 0; x < p.width + unit; x += step) {
+    for (let y = 0; y < p.height + unit; y += step) {
       groups.push({
         x,
         y,
-        shapeSize: shapeSize * p.random(0.7, 1.3),
+        shapeSize: unit * p.random(0.7, 1.3),
         r: p.random(255),
         g: p.random(255),
         b: p.random(255),
@@ -44,16 +60,17 @@ const createTriangleGroups = (p, shapeSize) => {
 };
 
 const drawTriangleGroup = (p, group, flash = 0, pop = 0) => {
+  const k = screenScale(p); // stroke weights shrink with the geometry on small screens
   if (flash > 0) {
     p.stroke(
       p.lerp(group.r, 255, flash),
       p.lerp(group.g, 255, flash),
       p.lerp(group.b, 255, flash),
     );
-    p.strokeWeight(1 + flash * 2.5);
+    p.strokeWeight((1 + flash * 2.5) * k);
   } else {
     p.stroke(group.r, group.g, group.b);
-    p.strokeWeight(1);
+    p.strokeWeight(k);
   }
   p.fill(group.r, group.g, group.b, FILL_ALPHA);
 
@@ -71,28 +88,28 @@ const drawTriangleGroup = (p, group, flash = 0, pop = 0) => {
     if (scale === 0.5) {
       p.noFill();
       p.stroke(255, 255, 255, 26 + flash * 30);
-      p.strokeWeight(9);
+      p.strokeWeight(9 * k);
       p.triangle(x1, y1, x2, y2, x3, y3);
       p.stroke(255, 255, 255, 65 + flash * 40);
-      p.strokeWeight(4);
+      p.strokeWeight(4 * k);
       p.triangle(x1, y1, x2, y2, x3, y3);
       p.fill(group.r, group.g, group.b, FILL_ALPHA);
       p.stroke(255, 255, 255, 235);
-      p.strokeWeight(1.5 + flash * 2);
+      p.strokeWeight((1.5 + flash * 2) * k);
       p.triangle(x1, y1, x2, y2, x3, y3);
       continue;
     }
 
+    const gain = STROKE_TARGET / Math.max(1, group.r, group.g, group.b);
+    const sr = Math.min(255, group.r * gain);
+    const sg = Math.min(255, group.g * gain);
+    const sb = Math.min(255, group.b * gain);
     if (flash > 0) {
-      p.stroke(
-        p.lerp(group.r, 255, flash),
-        p.lerp(group.g, 255, flash),
-        p.lerp(group.b, 255, flash),
-      );
-      p.strokeWeight(1 + flash * 2.5);
+      p.stroke(p.lerp(sr, 255, flash), p.lerp(sg, 255, flash), p.lerp(sb, 255, flash));
+      p.strokeWeight((INNER_STROKE + flash * 2.5) * k);
     } else {
-      p.stroke(group.r, group.g, group.b);
-      p.strokeWeight(1);
+      p.stroke(sr, sg, sb);
+      p.strokeWeight(INNER_STROKE * k);
     }
     p.fill(group.r, group.g, group.b, FILL_ALPHA);
     p.triangle(x1, y1, x2, y2, x3, y3);
@@ -235,6 +252,8 @@ const sketch = (p) => {
 
   p.windowResized = () => {
     p.resizeCanvas(window.innerWidth, window.innerHeight);
+    // Re-lay the grid against the new short axis so the figure keeps its scale.
+    if (p.cueGroups.length) p.cueGroups = createTriangleGroups(p, p.shapeSize);
   };
 };
 
