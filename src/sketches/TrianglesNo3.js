@@ -78,12 +78,15 @@ const drawTriangleGroup = (p, group, flash = 0, pop = 0) => {
   const scales = [0.5, 1, 2, 4];
   for (let s = 0; s < scales.length; s += 1) {
     const scale = scales[s];
-    const x1 = group.x - size / scale;
-    const y1 = group.y + size / scale;
+    // Concentric layers: total height is 2*S, centroid splits the median 2:1,
+    // so apex sits 4/3*S above and base 2/3*S below the shared center.
+    const S = size / scale;
+    const x1 = group.x - S;
+    const y1 = group.y + (2 / 3) * S;
     const x2 = group.x;
-    const y2 = group.y - size / scale;
-    const x3 = group.x + size / scale;
-    const y3 = group.y + size / scale;
+    const y2 = group.y - (4 / 3) * S;
+    const x3 = group.x + S;
+    const y3 = group.y + (2 / 3) * S;
 
     if (scale === 0.5) {
       p.noFill();
@@ -118,6 +121,7 @@ const drawTriangleGroup = (p, group, flash = 0, pop = 0) => {
 
 const sketch = (p) => {
   p.loopAudio = false;
+  p.showingStatic = true;
   p.shapeSize = INITIAL_SHAPE_SIZE;
   p.cueGroups = [];
   p.cueStart = 0;
@@ -152,6 +156,10 @@ const sketch = (p) => {
     p.canvas.style.left = '0';
     p.canvas.style.zIndex = '1';
     p.canvas.style.background = 'transparent';
+
+    // Static preview so first load shows triangles, not just the gradient —
+    // same showingStatic pattern as the Donuts sketches. First cue replaces it.
+    p.cueGroups = createTriangleGroups(p, INITIAL_SHAPE_SIZE);
 
     const params = new URLSearchParams(window.location.search);
     const wantsFps = !params.has('fps') || params.get('fps') !== '0';
@@ -196,6 +204,14 @@ const sketch = (p) => {
     }
 
     p.clear();
+
+    if (p.showingStatic) {
+      for (let index = 0; index < p.cueGroups.length; index += 1) {
+        drawTriangleGroup(p, p.cueGroups[index], 0, 0);
+      }
+      p.noLoop();
+      return;
+    }
 
     if (!p.cueGroups.length) return;
 
@@ -246,14 +262,20 @@ const sketch = (p) => {
     setFullScreenOverlayOpacity(p, 0.92);
   };
 
-  p.mouseClicked = () => {
+  p.mousePressed = () => {
     p.togglePlayback();
+    if (p.song?.isPlaying()) {
+      p.resetAnimation();
+      p.showingStatic = false;
+      p.loop();
+    }
   };
 
   p.windowResized = () => {
     p.resizeCanvas(window.innerWidth, window.innerHeight);
     // Re-lay the grid against the new short axis so the figure keeps its scale.
     if (p.cueGroups.length) p.cueGroups = createTriangleGroups(p, p.shapeSize);
+    if (p.showingStatic) p.redraw();
   };
 };
 
