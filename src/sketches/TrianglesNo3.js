@@ -2,6 +2,8 @@ import p5 from 'p5';
 import '@lib/p5.audioReact.js';
 import '../lib/p5.fps.js';
 import initCapture from '@labcat2020/p5.audioreactive-capture';
+import { createDomLayerCaptureBackground } from '@labcat2020/p5.audioreactive-capture/dom-layer';
+import { compositeDomCaptureExtension } from '@labcat2020/p5.audioreactive-capture/composite';
 import {
   installFullScreenBg,
   randomizeFullScreenBg,
@@ -174,6 +176,10 @@ const sketch = (p) => {
     initCapture(p, {
       prefix: 'TrianglesNo3',
       enabled: false,
+      captureCSSBackground: true,
+      extension: compositeDomCaptureExtension({
+        background: createDomLayerCaptureBackground(p.bgWrapperEl),
+      }),
     });
 
     await p.loadSong(audioUrl, midiUrl, (data) => {
