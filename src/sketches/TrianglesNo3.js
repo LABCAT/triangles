@@ -192,6 +192,11 @@ const sketch = (p) => {
   };
 
   p.draw = () => {
+    // Headless capture drives draw() directly and never clicks, so the static
+    // preview branch would otherwise freeze the triangles for the whole run
+    // (only the DOM gradient animates). Drop the poster as soon as capture starts.
+    if (p.captureInProgress) p.showingStatic = false;
+
     if (p.fullScreenEnvelope.active) {
       const nowSec = p.getSongPlaybackTime?.() ?? 0;
       const elapsed = nowSec * 1000 - p.fullScreenEnvelope.startTime;
