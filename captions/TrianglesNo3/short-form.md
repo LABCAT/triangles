@@ -1,6 +1,6 @@
-🔺 A field of neon triangles breathes with the bass. 🌈🎧
+🔺 Stained-glass triangles burn against the dark. 🌈💫
 
-#TrianglesNo3 — hollow prisms cascade across the frame, each #Fractal echo folding deeper into a #Kaleidoscopic dream of light 💎✨ color blooming like stained glass under voltage 🌌
+#TrianglesNo3 — hollow prisms cascade across the frame, each #Fractal echo folding deeper into a #Kaleidoscopic dream of light 💎✨ color blooming under voltage 🌌
 
 "Color is a power which directly influences the soul." — Wassily Kandinsky 🎨
 
